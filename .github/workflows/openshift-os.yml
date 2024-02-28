@@ -67,7 +67,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v3
         with:
-          repository: openshift/os
+          repository: jbtrystram/openshift-os
           # We need an unbroken commit chain when pushing to the fork.  Don't
           # make assumptions about which commits are already available there.
           fetch-depth: 0
@@ -109,7 +109,7 @@ jobs:
         uses: peter-evans/create-pull-request@v6.0.0
         with:
           token: ${{ secrets.COREOSBOT_RELENG_TOKEN }}
-          push-to-fork: coreosbot-releng/os
+          push-to-fork: jbtrystram/openshift-os
           branch: ${{ env.BRANCH_NAME }}
           base: ${{ env.TARGET_BRANCH }}
           commit-message: |
