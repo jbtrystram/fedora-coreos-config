@@ -3,7 +3,7 @@ on:
   # We could do push: branches: [testing-devel] but that would restart
   # downstream CI a lot
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '0/5 * * * *'
   workflow_dispatch:
     inputs:
       branch:
