@@ -14,15 +14,12 @@ on:
         type: choice
         options:
           - testing-devel
-          - branched
-          - rawhide
-          - next-devel
-          - rhcos-4.10
-          - rhcos-4.11
-          - rhcos-4.12
-          - rhcos-4.13
-          - rhcos-4.14
           - rhcos-4.15
+          - rhcos-4.14
+          - rhcos-4.13
+          - rhcos-4.12
+          - rhcos-4.11
+          - rhcos-4.10
 permissions:
   # none at all
   contents: none
