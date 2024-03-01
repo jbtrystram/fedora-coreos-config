@@ -20,6 +20,12 @@ on:
           - rhcos-4.12
           - rhcos-4.11
           - rhcos-4.10
+      jira:
+        description: The JIRA reference to put in the PR tittle. Defaults to "NO-JIRA".
+        required: false
+        default: NO-JIRA
+        type: string
+
 permissions:
   # none at all
   contents: none
@@ -30,20 +36,18 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SOURCE_BRANCH: ${{ github.event.inputs.branch }}
+      JIRA: ${{ github.event.inputs.jira }}
     steps:
       - name: Set branches values
         run: |
           case $SOURCE_BRANCH in
-              testing-devel)
-                echo "TARGET_BRANCH=master" >> $GITHUB_ENV
-                echo "BRANCH_NAME=fcc-sync" >> $GITHUB_ENV
-              ;;
               rhcos-*)
               # split the string around the -
                 array=(${SOURCE_BRANCH//-/ })
                 OCP_VERSION=${array[1]}
                 echo "TARGET_BRANCH=release-${OCP_VERSION}" >> $GITHUB_ENV
                 echo "BRANCH_NAME=fcc-sync-${SOURCE_BRANCH}" >> $GITHUB_ENV
+                echo "TITTLE_PREFIX=[release-${OCP_VERSION}] " >> $GITHUB_ENV
                 ;;
               *)
                 # Default branches names for on.schedule case
@@ -53,6 +57,7 @@ jobs:
               ;;
           esac
 
+          echo "JIRA=${JIRA:-NO-JIRA}" >> $GITHUB_ENV
       - name: Check out repository
         uses: actions/checkout@v3
         with:
@@ -105,7 +110,7 @@ jobs:
             Bump fedora-coreos-config
 
             ${{ env.SHORTLOG }}
-          title: "NO-JIRA: Bump fedora-coreos-config"
+          title: "${{ env.TITTLE_PREFIX }}${{ env.JIRA }}: Bump fedora-coreos-config"
           body: |
             Created by [GitHub workflow](${{ github.server_url }}/${{ github.repository }}/actions/workflows/openshift-os.yml) ([source](${{ github.server_url }}/${{ github.repository }}/blob/testing-devel/.github/workflows/openshift-os.yml)).
 
