@@ -10,7 +10,7 @@
 ARG VERSION="42"
 # XXX: This should be a digested pull that gets bumped.
 # https://gitlab.com/fedora/bootc/tracker/-/issues/34
-ARG BUILDER_IMG=quay.io/fedora/fedora-bootc:42
+ARG BUILDER_IMG=quay.io/fedora/fedora-bootc:43
 ARG MANIFEST=manifest.yaml
 
 ### Containerfile.base
