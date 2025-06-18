@@ -56,7 +56,7 @@ def build_rpm_lockfile_config(packages, locked_pkgs, repo_files):
         'contentOrigin': {
             'repofiles': repo_files
         },
-        'weakDependencies': False,
+        'installWeakDeps': False,
         'context': {
             'bare': True,
         },
