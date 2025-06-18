@@ -1,0 +1,89 @@
+import os
+import shutil
+import json
+import yaml
+
+CONTEXTDIR = '.'
+ARCH = 'x86_64'
+
+
+def get_locked_nevras(arch=ARCH):
+    overrides_path = os.path.join(CONTEXTDIR, "manifest-lock.overrides.yaml")
+    overrides_arch_path = os.path.join(CONTEXTDIR, f"manifest-lock.overrides.{arch}.yaml")
+
+    locks = {}
+    for path in [overrides_path, overrides_arch_path]:
+        if os.path.exists(path):
+            with open(path) as f:
+                if path.endswith('.yaml'):
+                    data = yaml.safe_load(f)
+                else:
+                    data = json.load(f)
+                # this essentially re-implements the merge semantics of rpm-ostree
+                locks.update({pkgname: v['evr'] if 'evr' in v else v['evr']
+                              for (pkgname, v) in data['packages'].items()})
+    return locks
+
+
+def inject_pool_repo(locked_nevras, outpout_path="/etc/yum.repos.d/pool.repo"):
+    # When adding the pool, we only want to _filter in_ locked packages;
+    # matching `lockfile-repos` semantics. This is abusing pretty hard the
+    # `includepkgs=` semantic but... it works.
+    shutil.copyfile(os.path.join(CONTEXTDIR, "fedora-coreos-pool.repo"),
+                    outpout_path)
+    packages = ','.join(locked_nevras)
+    with open(outpout_path, 'a') as f:
+        f.write(f"\nincludepkgs={packages}\n")
+
+def append_versions_from_locks(rpm_in_data, locks):
+    """
+    Augments package names in rpm_in_data with version numbers from locks.
+    Also ensures 'fedora-coreos-pool.repo' is in repofiles.
+    """
+    updated_packages = []
+    for pkg_name in rpm_in_data.get('packages', []):
+        if pkg_name in locks:
+            # If a lock exists, append the EVR
+            updated_packages.append(f"{pkg_name}-{locks[pkg_name]}")
+        else:
+            # Otherwise, keep the original package name
+            updated_packages.append(pkg_name)
+    rpm_in_data['packages'] = updated_packages
+
+    # Ensure contentOrigin and repofiles exist before adding.
+    if 'contentOrigin' not in rpm_in_data:
+        rpm_in_data['contentOrigin'] = {}
+    if 'repofiles' not in rpm_in_data['contentOrigin']:
+        rpm_in_data['contentOrigin']['repofiles'] = []
+    
+    # Check if 'fedora-coreos-pool.repo' is already in the list to avoid duplicates
+    if 'fedora-coreos-pool.repo' not in rpm_in_data['contentOrigin']['repofiles']:
+        rpm_in_data['contentOrigin']['repofiles'].append("fedora-coreos-pool.repo")
+    
+    return rpm_in_data
+
+
+if __name__ == '__main__':
+
+    # 1 get list of overrides
+    locks = get_locked_nevras()
+
+    # 2 create repofile to pull the overrides from
+    transformed_locked_nevras = [f'{k}-{v}' for (k, v) in locks.items()]
+    inject_pool_repo(transformed_locked_nevras, os.path.join(CONTEXTDIR, 'overrides.repo'))
+    print(f"Overrides repository created at: {os.path.join(CONTEXTDIR, 'overrides.repo')}")
+
+    # 3 Load the rpm-input.yaml file.
+    rpm_input_path = os.path.join(CONTEXTDIR, 'rpm-input.yaml')
+    with open(rpm_input_path, 'r') as f:
+        rpm_in = yaml.safe_load(f)
+
+    # 4 Append versions and add repo info
+    augmented_rpm_in = append_versions_from_locks(rpm_in, locks)
+
+    # 5 Output the modified YAML
+    output_path = os.path.join(CONTEXTDIR, 'rpm-output.yaml')
+    with open(output_path, 'w') as f:
+        yaml.safe_dump(augmented_rpm_in, f, default_flow_style=False)
+
+    print(f"Augmented RPM data saved to: {output_path}")

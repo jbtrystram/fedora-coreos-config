@@ -20,6 +20,7 @@ jobs:
           ref: hermetic-podman-rawhide
       - name: Fix rawhide repofile
         run: |
+          # TODO multi arch support
           export basearch="x86_64"
           export releasever="rawhide"
           envsubst '$basearch,$releasever' < fedora-rawhide.repo > fedora-rawhide-generated.repo
@@ -28,7 +29,8 @@ jobs:
         run: |
           # python is not happy importing a module without the py extension
           cp build-rootfs .github/scripts/container_native.py
-          python .github/scripts/generate_rpm_in --repo fedora-rawhide-generated.repo $(pwd)/manifest.yaml
+          # TODO use repo definition from the container we're deriving from.
+          python .github/scripts/generate_rpm_lockfile_config --repo fedora-rawhide-generated.repo $(pwd)/manifest.yaml
       - name: Fix /usr/share paths
         # workaround for https://github.com/konflux-ci/rpm-lockfile-prototype/issues/102
         run: sed -i '/makedumpfile/c\- makedumpfile' rpm-input.yaml
