@@ -1,0 +1,53 @@
+#!/usr/bin/python
+
+import argparse
+import yaml
+import container_native
+
+
+def write_rpms_input_file(packages, repo_files, output_path='rpm-input.yaml'):
+    rpm_lockfile_input = {
+        'contentOrigin': {
+            'repofiles': repo_files
+        },
+        'context': {
+            'bare': True,
+        },
+        'packages': packages
+    }
+
+    try:
+        with open(output_path, 'w') as f:
+            yaml.dump(rpm_lockfile_input, f, default_flow_style=False, sort_keys=False, indent=2)
+        print(f"✅ Generated rpm-lockfile-protype input to '{output_path}'")
+    except IOError as e:
+        print(f"❌ Error: Could not write to file '{output_path}'. Reason: {e}")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Generate rpm-lockfile-prototype inptut file from rpm-ostree manifest"
+    )
+
+    parser.add_argument(
+        '--repo',
+        action='append',
+        required=True,
+        help='Repo file path to use. Can be specified multiple times.'
+    )
+    parser.add_argument(
+        '--output',
+        default='rpm-input.yaml',
+        help="Path for the output rpm-lockfile-protoype input file. (default: 'rpm-input.yaml')"
+    )
+    parser.add_argument('manifest', help='Path to the rpm-ostree manifest')
+
+    args = parser.parse_args()
+
+    manifest = container_native.get_treefile(args.manifest)
+
+    write_rpms_input_file(
+        packages=manifest['packages'],
+        repo_files=args.repo,
+        output_path=args.output
+    )
