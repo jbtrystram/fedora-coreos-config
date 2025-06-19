@@ -9,45 +9,37 @@ jobs:
   update-hermeto-lockfiles:
     runs-on: ubuntu-latest
     container: quay.io/coreos-assembler/fcos-buildroot:testing-devel
+    # TODO matrix for every branch
     steps:
       - name: Install dependencies
         run: dnf install -y node python3 python3-pip python3-dnf rpm-ostree
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # FIXEME ref: rawhide
           repository: jbtrystram/fedora-coreos-config
           ref: hermetic-podman-rawhide
-      - name: Fix rawhide repofile
-        run: |
-          # TODO multi arch support
-          export basearch="x86_64"
-          export releasever="rawhide"
-          envsubst '$basearch,$releasever' < fedora-rawhide.repo > fedora-rawhide-generated.repo
-          sed -i '/fedora-secondary/d' fedora-rawhide-generated.repo
       - name: Generate rpm-lockfile input file
         run: |
           # python is not happy importing a module without the py extension
           cp build-rootfs .github/scripts/container_native.py
-          # TODO use repo definition from the container we're deriving from.
-          python .github/scripts/generate_rpm_lockfile_config --repo fedora-rawhide-generated.repo --manifest $(pwd)/manifest.yaml
+          python .github/scripts/generate_rpm_lockfile_config --repo fedora-coreos-pool.repo $(pwd)/manifest.yaml
       - name: Fix /usr/share paths
         # workaround for https://github.com/konflux-ci/rpm-lockfile-prototype/issues/102
-        run: sed -i '/makedumpfile/c\- makedumpfile' rpm-output.yaml
+        run: sed -i '/makedumpfile/c\- makedumpfile' rpm.in.yaml
       - name: install rpm-lockfile-prototype
         run: |
            python3 -m pip install https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/heads/main.zip
       - name: generate lockfile
-        run: rpm-lockfile-prototype rpm-output.yaml
+        run: rpm-lockfile-prototype rpm.in.yaml
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "Update hermeto lockfiles with the latest content"
-          title: "[rawhide] Bump hermeto lockfiles"
+          commit-message: "Update hermeto lockfiles with the latest content from fedora-coreos-pool"
+          title: "Bump hermeto lockfiles"
           add-paths: rpms.lock.yaml
           body: |
             This is an auto-generated PR with the results of rpm-lockfile-prototype.
             Source : <link to GH workflow file>
-          branch: "rawhide-bump-lockfiles"
+          branch: "bump-lockfiles"
           delete-branch: true

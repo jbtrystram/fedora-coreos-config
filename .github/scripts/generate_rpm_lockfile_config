@@ -85,17 +85,16 @@ if __name__ == "__main__":
         '--repo',
         action='append',
         required=True,
-        help='Repo file path to use for initial rpm-input.yaml generation. Can be specified multiple times.'
+        help='Repo file path to inject into rpm-lockfile configuration. Can be specified multiple times.'
     )
     parser.add_argument(
-        '--manifest',
-        required=True,
-        help='Path to the rpm-ostree manifest (e.g., config/manifest-fedora-coreos.yaml)'
+        'manifest',
+        help='Path to the rpm-ostree manifest (e.g., fedora-coreos-config/manifest.yaml)'
     )
     parser.add_argument(
         '--output',
-        default=os.path.join(CONTEXTDIR, 'rpm-output.yaml'),
-        help="Path for the final augmented rpm-lockfile-protoype input file. (default: 'rpm-output.yaml')"
+        default='./rpm.in.yaml',
+        help="Path for the final rpm-lockfile-protoype config file. (default: './rpm.in.yaml')"
     )
 
     args = parser.parse_args()
@@ -109,7 +108,7 @@ if __name__ == "__main__":
     print("Step 2: Retrieving package overrides...")
     locks = get_locked_nevras()
 
-    
+
     # Create overrides.repo if necessary
     repos = args.repo
     if locks:
