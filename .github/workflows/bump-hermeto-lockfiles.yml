@@ -15,9 +15,6 @@ jobs:
         run: dnf install -y node python3 python3-pip python3-dnf rpm-ostree
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          repository: jbtrystram/fedora-coreos-config
-          ref: hermetic-podman-rawhide
       - name: Generate rpm-lockfile input file
         run: |
           # python is not happy importing a module without the py extension
