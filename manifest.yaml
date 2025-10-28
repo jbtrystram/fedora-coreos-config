@@ -1,6 +1,8 @@
 metadata:
   # tell `cosa build` to default to buildah path
   build_with_buildah: true
+  # tell `cosa osbuild` to use bootc-install manifests
+  use_bootc_install: true
 
 conditional-include:
   # TODO: There is no coreos-pool for RISCV yet
