@@ -1,0 +1,135 @@
+#!/usr/bin/python
+
+import argparse
+import json
+import os
+import shutil
+import sys
+import yaml
+
+# Correctly import container_native from the specified path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) + '/.github/scripts/')
+import container_native
+sys.path.pop(0)
+
+
+CONTEXTDIR = '.' # This can be made configurable
+ARCH = 'x86_64' # This can be made configurable
+
+
+def get_locked_nevras(arch=ARCH):
+    overrides_path = os.path.join(CONTEXTDIR, "manifest-lock.overrides.yaml")
+    overrides_arch_path = os.path.join(CONTEXTDIR, f"manifest-lock.overrides.{arch}.yaml")
+
+    locks = {}
+    for path in [overrides_path, overrides_arch_path]:
+        if os.path.exists(path):
+            with open(path) as f:
+                if path.endswith('.yaml'):
+                    data = yaml.safe_load(f)
+                else:
+                    data = json.load(f)
+                locks.update({pkgname: v['evr'] if 'evr' in v else v['evr']
+                              for (pkgname, v) in data['packages'].items()})
+    return locks
+
+
+def generate_override_repo(locked_nevras, output_path="/etc/yum.repos.d/pool.repo"):
+    source_repo_path = os.path.join(CONTEXTDIR, "fedora-coreos-pool.repo")
+    if not os.path.exists(source_repo_path):
+        print(f"Warning: {source_repo_path} not found. Skipping pool repo injection.")
+        return
+
+    shutil.copyfile(source_repo_path, output_path)
+    packages_str = ','.join(locked_nevras)
+    with open(output_path, 'a') as f:
+        f.write(f"\nincludepkgs={packages_str}\n")
+
+def build_rpm_lockfile_config(packages, locked_pkgs, repo_files):
+    """
+    Augments package names in rpm_in_data with version numbers from locks.
+    Populates contentOrigin and repofiles.
+    """
+    # Initialize the structure for rpm_lockfile_input, similar to write_rpms_input_file
+    # This ensures consistency whether it comes from a manifest or directly
+    rpm_lockfile_config = {
+        'contentOrigin': {
+            'repofiles': repo_files
+        },
+        'installWeakDeps': False,
+        'context': {
+            'bare': True,
+        },
+        'packages': []
+    }
+
+    updated_packages = []
+    for pkg_name in packages:
+        # If a lock exists, append the EVR
+        if pkg_name in locked_pkgs:
+            updated_packages.append(f"{pkg_name}-{locked_pkgs[pkg_name]}")
+        # Otherwise, keep the original package name
+        else:
+            updated_packages.append(pkg_name)
+    rpm_lockfile_config['packages'] = updated_packages
+
+    return rpm_lockfile_config
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Generate rpm-lockfile-prototype input file from rpm-ostree manifest and augment with version overrides."
+    )
+
+    parser.add_argument(
+        '--repo',
+        action='append',
+        required=True,
+        help='Repo file path to inject into rpm-lockfile configuration. Can be specified multiple times.'
+    )
+    parser.add_argument(
+        'manifest',
+        help='Path to the rpm-ostree manifest (e.g., fedora-coreos-config/manifest.yaml)'
+    )
+    parser.add_argument(
+        '--output',
+        default='./rpm.in.yaml',
+        help="Path for the final rpm-lockfile-protoype config file. (default: './rpm.in.yaml')"
+    )
+
+    args = parser.parse_args()
+
+    # 1. Get initial manifest data from container_native
+    print("Step 1: Getting manifest data...")
+    manifest_data = container_native.get_treefile(args.manifest)
+    packages = manifest_data.get('packages', [])
+
+    # 2. Get locked NEVRAs from manifest-lock.overrides.yaml
+    print("Step 2: Retrieving package overrides...")
+    locks = get_locked_nevras()
+
+
+    # Create overrides.repo if necessary
+    repos = args.repo
+    if locks:
+        print("Step 5: Creating overrides repository...")
+        transformed_locked_nevras = [f'{k}-{v}' for (k, v) in locks.items()]
+        generate_override_repo(transformed_locked_nevras, os.path.join(CONTEXTDIR, 'overrides.repo'))
+        print(f"✅ Overrides repository created at: {os.path.join(CONTEXTDIR, 'overrides.repo')}")
+        repos.append('overrides.repo')
+
+    # 3. Augment with versions from locks and add repo info
+    print("Step 3: Augmenting packages with version information...")
+    augmented_rpm_in = build_rpm_lockfile_config(packages, locks, repos)
+
+    # 4. Output the final modified YAML
+    print(f"Step 4: Saving final augmented RPM data to {args.output}...")
+    try:
+        with open(args.output, 'w') as f:
+            yaml.safe_dump(augmented_rpm_in, f, default_flow_style=False)
+        print(f"✅ Augmented RPM data saved to: {args.output}")
+    except IOError as e:
+        print(f"❌ Error: Could not write to final output file '{args.output}'. Reason: {e}")
+        exit(1)
+
+
