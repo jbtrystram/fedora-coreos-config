@@ -38,8 +38,10 @@ case "${AUTOPKGTEST_REBOOT_MARK:-}" in
     ;;
 rebooted)
     ok "second boot"
-    if ! bootupctl status | grep "CoreOS aleph version"; then
-        fatal "bootupctl status output should include 'CoreOS aleph version'"
+    # https://github.com/coreos/bootupd/pull/1124 renamed the output from
+    # "CoreOS aleph version" to "Aleph version", match both for compatibility.
+    if ! bootupctl status | grep -i "aleph version"; then
+        fatal "bootupctl status output should include 'aleph version'"
     fi
 
     ok bootupctl
